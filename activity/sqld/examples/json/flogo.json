@@ -1,0 +1,105 @@
+{
+  "name": "MyProxy",
+  "type": "flogo:app",
+  "version": "1.0.0",
+  "description": "This is a simple proxy with sql injection attack protection.",
+  "properties": null,
+  "channels": null,
+  "triggers": [
+    {
+      "name": "flogo-rest",
+      "id": "MyProxy",
+      "ref": "github.com/r2d2-ai/contrib/trigger/rest",
+      "settings": {
+        "port": "9096"
+      },
+      "handlers": [
+        {
+          "settings": {
+            "method": "PUT",
+            "path": "/pets"
+          },
+          "actions": [
+            {
+              "id": "microgateway:Update"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "id": "microgateway:Update",
+      "compressed": false,
+      "data": {
+        "name": "Update",
+        "steps": [
+          {
+            "service": "SQLSecurity",
+            "input": {
+              "payload": "=$.payload"
+            }
+          },
+          {
+            "if": "$.SQLSecurity.outputs.attack < 80",
+            "service": "PetStorePetsUpdate",
+            "input": {
+              "content": "=$.payload.content"
+            }
+          }
+        ],
+        "responses": [
+          {
+            "if": "$.SQLSecurity.outputs.attack < 80",
+            "error": false,
+            "output": {
+              "code": 200,
+              "data": "=$.PetStorePetsUpdate.outputs.data"
+            }
+          },
+          {
+            "if": "$.SQLSecurity.outputs.attack > 80",
+            "error": true,
+            "output": {
+              "code": 403,
+              "data": {
+                "error": "hack attack!",
+                "attackValues": "=$.SQLSecurity.outputs.attackValues"
+              }
+            }
+          }
+        ],
+        "services": [
+          {
+            "name": "SQLSecurity",
+            "description": "Look for sql injection attacks",
+            "ref": "github.com/r2d2-ai/aiflow/microgateway/activity/sqld"
+          },
+          {
+            "name": "PetStorePetsUpdate",
+            "description": "Update pets",
+            "ref": "github.com/r2d2-ai/contrib/activity/rest",
+            "settings": {
+              "uri": "http://petstore.swagger.io/v2/pet",
+              "method": "PUT",
+              "headers": {
+                "Accept": "application/json"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "actions": [
+    {
+      "ref": "github.com/r2d2-ai/aiflow-microgateway",
+      "settings": {
+        "uri": "microgateway:Update"
+      },
+      "id": "microgateway:Update",
+      "metadata": null
+    }
+  ]
+}

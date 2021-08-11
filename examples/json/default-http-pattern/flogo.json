@@ -1,0 +1,52 @@
+{
+  "name": "MyProxy",
+  "type": "flogo:app",
+  "version": "1.0.0",
+  "description": "This is a simple proxy.",
+  "properties": null,
+  "channels": null,
+  "triggers": [
+    {
+      "name": "flogo-rest",
+      "id": "MyProxy",
+      "ref": "github.com/r2d2-ai/contrib/trigger/rest",
+      "settings": {
+        "port": "9096"
+      },
+      "handlers": [
+        {
+          "settings": {
+            "method": "GET",
+            "path": "/endpoint"
+          },
+          "actions": [
+            {
+              "ref": "github.com/r2d2-ai/aiflow-microgateway",
+              "settings": {
+                "uri": "pattern://DefaultHttpPattern",
+            		"useRateLimiter": true,
+            		"rateLimit": "1-S",
+            		"useJWT": true,
+            		"jwtSigningMethod": "HMAC",
+            		"jwtKey": "qwertyuiopasdfghjklzxcvbnm789101",
+            		"jwtAud": "www.mashling.io",
+            		"jwtIss": "Mashling",
+            		"jwtSub": "tempuser@mail.com",
+            		"useCircuitBreaker": true,
+            		"backendUrl": "http://localhost:1234/pets",
+                "mode": "a",
+                "threshold": 2,
+                "timeout": 60,
+                "period": 60,
+                "method": "POST",
+                "content": "{\"name\":\"sally\"}"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "resources": [],
+  "actions": []
+}

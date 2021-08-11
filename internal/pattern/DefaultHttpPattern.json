@@ -1,0 +1,155 @@
+{
+  "name": "DefaultHttpPattern",
+  "steps": [
+    {
+      "if": "$.conf.useRateLimiter == true",
+      "service": "RateLimiter",
+      "input": {
+        "token": "global"
+      }
+    },
+    {
+      "if": "$.conf.useJWT == true",
+      "service": "JWTValidator",
+      "input": {
+        "token": "=$.payload.headers.Authorization",
+        "signingMethod": "=$.conf.jwtSigningMethod",
+        "key": "=$.conf.jwtKey",
+        "aud": "=$.conf.jwtAud",
+        "iss": "=$.conf.jwtIss",
+        "sub": "=$.conf.jwtSub"
+      }
+    },
+    {
+      "if": "$.conf.useCircuitBreaker == true",
+      "service": "CircuitBreaker"
+    },
+    {
+      "if": "($.conf.useJWT == false || $.JWTValidator.outputs.valid == true) && $.conf.method == 'GET'" ,
+      "service": "HttpBackendA",
+      "halt": "($.HttpBackendA.error != nil) && !error.isneterror($.HttpBackendA.error)"
+    },
+    {
+      "if": "($.conf.useJWT == false || $.JWTValidator.outputs.valid == true) && ($.conf.method == 'PUT' || $.conf.method == 'POST' || $.conf.method == 'PATCH')",
+      "service": "HttpBackendB",
+      "input": {
+        "content": "=$.conf.content"
+      },
+      "halt": "($.HttpBackendB.error != nil) && !error.isneterror($.HttpBackendB.error)"
+    },
+    {
+      "if": "$.conf.useCircuitBreaker == true && (($.HttpBackendA.error != nil && $.conf.method == 'GET')|| ($.HttpBackendB.error != nil && ($.conf.method == 'PUT' || $.conf.method == 'POST' || $.conf.method == 'PATCH')))",
+      "service": "CircuitBreaker",
+      "input": {
+        "operation": "counter"
+      }
+    },
+    {
+      "if": "$.conf.useCircuitBreaker == true && (($.HttpBackendA.error == nil && $.conf.method == 'GET')|| ($.HttpBackendB.error == nil && ($.conf.method == 'PUT' || $.conf.method == 'POST' || $.conf.method == 'PATCH')))",
+      "service": "CircuitBreaker",
+      "input": {
+        "operation": "reset"
+      }
+    }
+  ],
+  "responses": [
+    {
+      "if": "$.RateLimiter.outputs.limitReached == true",
+      "error": true,
+      "output": {
+        "code": 403,
+        "data": {
+          "status": "Rate Limit Exceeded - The service you have requested is over the allowed limit."
+        }
+      }
+    },
+    {
+      "if": "$.conf.useJWT == true && $.JWTValidator.outputs.valid == false",
+      "error": true,
+      "output": {
+        "code": 401,
+        "data": {
+          "errorMessage": "=$.JWTValidator.outputs.errorMessage",
+          "validationMessage": "=$.JWTValidator.outputs.validationMessage"
+        }
+      }
+    },
+    {
+      "if": "$.conf.useCircuitBreaker == true && $.CircuitBreaker.outputs.tripped == true",
+      "error": true,
+      "output": {
+        "code": 403,
+        "data": {
+          "error": "circuit breaker tripped"
+        }
+      }
+    },
+    {
+      "if": "($.conf.useJWT == false || $.JWTValidator.outputs.valid == true) && $.conf.method == 'GET'",
+      "error": false,
+      "output": {
+        "code": 200,
+        "data": "=$.HttpBackendA.outputs.data"
+      }
+    },
+    {
+      "if": "($.conf.useJWT == false || $.JWTValidator.outputs.valid == true) && ($.conf.method == 'PUT' || $.conf.method == 'POST' || $.conf.method == 'PATCH')",
+      "error": false,
+      "output": {
+        "code": 200,
+        "data": "=$.HttpBackendB.outputs.data"
+      }
+    },
+    {
+      "error": true,
+      "output": {
+        "code": 400,
+        "data": "Error"
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "RateLimiter",
+      "description": "Rate limiter",
+      "ref": "github.com/r2d2-ai/aiflow/microgateway/activity/ratelimiter",
+      "settings": {
+        "limit": "=$.conf.rateLimit"
+      }
+    },
+    {
+      "name": "JWTValidator",
+      "description": "Validate some tokens",
+      "ref": "github.com/r2d2-ai/aiflow/microgateway/activity/jwt"
+    },
+    {
+      "name": "CircuitBreaker",
+      "description": "Circuit breaker service",
+      "ref": "github.com/r2d2-ai/aiflow/microgateway/activity/circuitbreaker",
+      "settings": {
+        "mode": "=$.conf.mode",
+        "threshold": "=$.conf.threshold",
+        "timeout": "=$.conf.timeout",
+        "period": "=$.conf.period"
+      }
+    },
+    {
+      "name": "HttpBackendA",
+      "description": "Make an http call to your backend",
+      "ref": "github.com/r2d2-ai/contrib/activity/rest",
+      "settings": {
+        "method": "=$.conf.method",
+        "uri": "=$.conf.backendUrl"
+      }
+    },
+    {
+      "name": "HttpBackendB",
+      "description": "Make an http call to your backend",
+      "ref": "github.com/r2d2-ai/contrib/activity/rest",
+      "settings": {
+        "method": "=$.conf.method",
+        "uri": "=$.conf.backendUrl"
+      }
+    }
+  ]
+}

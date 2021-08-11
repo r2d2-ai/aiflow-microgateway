@@ -1,0 +1,56 @@
+{
+  "name": "DefaultChannelPattern",
+  "steps": [
+    {
+      "if": "$.conf.useJWT == true",
+      "service": "JWTValidator",
+      "input": {
+        "token": "=$.payload.headers.Authorization",
+        "key": "=$.conf.jwtKey"
+      }
+    },
+    {
+      "if": "$.conf.useJWT == false || $.JWTValidator.outputs.valid == true",
+      "service": "ActionBackend",
+      "input": {
+        "channel": "=$.conf.channel",
+        "value": "=$.conf.value"
+      },
+      "halt": "false"
+    }
+  ],
+  "responses": [
+    {
+      "if": "$.conf.useJWT == true && $.JWTValidator.outputs.valid == false",
+      "error": true,
+      "output": {
+        "code": 401,
+        "data": {
+          "errorMessage": "=$.JWTValidator.outputs.errorMessage",
+          "validationMessage": "=$.JWTValidator.outputs.validationMessage"
+        }
+      }
+    },
+    {
+      "error": false,
+      "output": {
+        "code": 200,
+        "data": {
+          "response": "Success!"
+        }
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "JWTValidator",
+      "description": "Validate some tokens",
+      "ref": "github.com/r2d2-ai/aiflow/microgateway/activity/jwt"
+    },
+    {
+      "name": "ActionBackend",
+      "description": "Make an action call to your backend",
+      "ref": "github.com/r2d2-ai/contrib/activity/channel"
+    }
+  ]
+}

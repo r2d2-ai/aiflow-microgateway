@@ -1,0 +1,23 @@
+{
+  "name": "microgateway",
+  "type": "AIflow:action",
+  "version": "0.0.1",
+  "title": "Microgateway Action",
+  "description": "Microgateway action for routing traffic",
+  "homepage": "https://github.com/r2d2-ai/aiflow-microgateway",
+  "settings": [
+    {
+      "name": "uri",
+      "type": "string",
+      "required": true,
+      "description" : "The location of the microgateway resource"
+    },
+    {
+      "name": "async",
+      "type": "bool",
+      "description" : "Execute the resource in an asynchronous manner"
+    }
+  ],
+  "input": [],
+  "output": []
+}
